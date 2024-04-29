@@ -1,0 +1,35 @@
+[package]
+name = "hptp"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.release]
+    opt-level = 3
+    strip = true
+    lto = "fat"
+    panic = "unwind"
+    codegen-units = 1
+    incremental = false
+
+[profile.dev]
+    opt-level = 0
+    incremental = true
+    debug = true
+    panic = "unwind"
+    strip = false
+    lto = "off"
+
+[dependencies]
+tokio = { version = "1.37.0", features = ["full"] }
+ahash = "0.8.11"
+arc-swap = "1.7.1"
+log = { version = "0.4.21", features = ["release_max_level_off"] }
+env_logger = "0.11.3"
+arrayvec = "0.7.4"
+paste = "1.0.14"
+
+[dependencies.simple_logger]
+version = "4.3.3"
+features = ["colors", "timestamps", "threads", "stderr"]
