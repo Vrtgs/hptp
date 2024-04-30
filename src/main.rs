@@ -1,17 +1,45 @@
 use crate::stream::ManyTcpListener;
-use std::net::Ipv6Addr;
+use clap::Parser;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::io;
 use tokio::net::TcpStream;
 
 mod stream;
 
+#[derive(strum::Display)]
+enum AllowProtocol {
+    #[strum(to_string = "0.0.0.0")]
+    Ipv4,
+    #[strum(to_string = "[::]")]
+    Ipv6,
+    #[strum(to_string = "0.0.0.0 and [::]")]
+    Both,
+}
 
-async fn listen(ports: &[u16], addr: &'static str) -> io::Result<()> {
-    let mut listener = ManyTcpListener::bind(
-        ports.iter().map(|&port| (Ipv6Addr::UNSPECIFIED, port)),
-        ports.len(),
-    )
-    .await?;
+async fn listen(ports: &[u16], addr: &'static str, allow: AllowProtocol) -> io::Result<()> {
+    let mut listener = match allow {
+        prot @ (AllowProtocol::Ipv4 | AllowProtocol::Ipv6) => {
+            let addr = match prot {
+                AllowProtocol::Ipv4 => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                AllowProtocol::Ipv6 => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+                _ => unreachable!(),
+            };
+
+            ManyTcpListener::bind(ports.iter().map(|&port| (addr, port)), ports.len()).await?
+        }
+        AllowProtocol::Both => {
+            ManyTcpListener::bind(
+                ports.iter().flat_map(|&port| {
+                    [
+                        SocketAddr::from((Ipv4Addr::UNSPECIFIED, port)),
+                        SocketAddr::from((Ipv6Addr::UNSPECIFIED, port)),
+                    ]
+                }),
+                ports.len() * 2,
+            )
+            .await?
+        }
+    };
 
     loop {
         let res = listener
@@ -31,12 +59,15 @@ async fn listen(ports: &[u16], addr: &'static str) -> io::Result<()> {
                 &mut TcpStream::connect((addr, local_port)).await?,
             )
             .await
+            .inspect_err(|e| log::debug!("Error during copy: {e}"))
+            .inspect(|metrics| log::info!("Completed connection successfully, metrics {metrics:?}"))
         });
     }
 }
 
-fn parse_array(str: &str) -> Option<Box<[u16]>> {
-    str.trim()
+fn parse_array(str: impl AsRef<str>) -> Option<Box<[u16]>> {
+    str.as_ref()
+        .trim()
         .strip_prefix('[')
         .and_then(|s| s.strip_suffix(']'))
         .and_then(|s| {
@@ -55,7 +86,11 @@ fn parse_array(str: &str) -> Option<Box<[u16]>> {
                     s.split_once("..")
                         .and_then(parse_range)
                         .map(RangeInclusive)
-                        .or_else(|| s.split_once("..!=").and_then(parse_range).map(RangeExclusive))
+                        .or_else(|| {
+                            s.split_once("..!=")
+                                .and_then(parse_range)
+                                .map(RangeExclusive)
+                        })
                 })
             });
 
@@ -67,7 +102,7 @@ fn parse_array(str: &str) -> Option<Box<[u16]>> {
                     RangeExclusive((start, end)) => nums.extend(start..end),
                 }
             }
-            
+
             nums.sort_unstable();
             nums.dedup();
 
@@ -75,15 +110,39 @@ fn parse_array(str: &str) -> Option<Box<[u16]>> {
         })
 }
 
+#[derive(Parser)]
+#[command(name = "hptp")]
+#[command(version = "1.0")]
+#[command(about = "high performance tcp proxy", long_about = None)]
+struct CliArgs {
+    #[clap(long)]
+    ipv4: bool,
+    #[clap(long)]
+    ipv6: bool,
+    #[clap(long, value_name = "the host this tcp proxy shall forward to")]
+    host: String,
+    #[clap(long, short, value_name = "the host this tcp proxy shall forward to")]
+    ports: String,
+}
+
 #[tokio::main]
 async fn main() {
     #[cfg(debug_assertions)]
     simple_logger::init_with_level(log::Level::Trace).unwrap();
-    listen(
-        &parse_array(&tokio::fs::read_to_string("./allowed-ports").await.unwrap())
-            .expect("invalid ports allow array"),
-        "vrtgs.xyz",
-    )
-    .await
-    .unwrap()
+    
+    let args = CliArgs::parse();
+    let allow = match (args.ipv4, args.ipv6) {
+        (true, false) => AllowProtocol::Ipv4,
+        (false, true) => AllowProtocol::Ipv6,
+        (true, true) => AllowProtocol::Both,
+        (false, false) => panic!("must have at least one of --ipv4 or --ipv6 flags"),
+    };
+
+    let ports = parse_array(args.ports).expect("invalid ports allow array");
+
+    let host = &*args.host.leak();
+
+    log::info!("Started listening on ip {allow} on ports [{ports:?}] and forwarding to {host}");
+    
+    listen(&ports, host, allow).await.unwrap()
 }
