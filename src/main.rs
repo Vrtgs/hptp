@@ -5,11 +5,6 @@ use tokio::net::TcpStream;
 
 mod stream;
 
-macro_rules! port_whitelist {
-    () => {
-        include!("../allowed-ports")
-    };
-}
 
 async fn listen(ports: &[u16], addr: &'static str) -> io::Result<()> {
     let mut listener = ManyTcpListener::bind(
