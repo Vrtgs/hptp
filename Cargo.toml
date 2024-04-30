@@ -29,6 +29,8 @@ log = { version = "0.4.21", features = ["release_max_level_off"] }
 env_logger = "0.11.3"
 arrayvec = "0.7.4"
 paste = "1.0.14"
+futures = "0.3.30"
+rand = "0.8.5"
 
 [dependencies.simple_logger]
 version = "4.3.3"
