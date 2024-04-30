@@ -24,14 +24,18 @@ async fn listen(ports: &[u16], addr: &'static str) -> io::Result<()> {
             .await
             .inspect(|(_, local, peer)| log::info!("New connection from `{peer}` to `{local}`"));
 
-        let Ok((mut stream, _, _)) = res else {
+        let Ok((mut stream, local, _)) = res else {
             log::debug!("connection failed {res:?}");
             continue;
         };
 
+        let local_port = local.port();
         tokio::spawn(async move {
-            let port = stream.local_addr()?.port();
-            io::copy_bidirectional(&mut stream, &mut TcpStream::connect((addr, port)).await?).await
+            io::copy_bidirectional(
+                &mut stream,
+                &mut TcpStream::connect((addr, local_port)).await?,
+            )
+            .await
         });
     }
 }
