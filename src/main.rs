@@ -1,5 +1,4 @@
 use crate::filter::{Filter, FilterMode, Port};
-use log::Level;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
@@ -7,22 +6,25 @@ use tokio::net::{TcpListener, TcpStream};
 mod filter;
 
 macro_rules! ip_blacklist {
-    () => {{
-        (include!("ip-blacklist") as [&str; { include!("ip-blacklist").len() }])
+    () => {
+        include!("ip-blacklist")
+            .map(std::convert::identity::<&str>)
             .map(str::parse::<IpAddr>)
             .map(Result::unwrap)
-    }};
+    };
 }
 
 macro_rules! port_whitelist {
-    () => {include!("allowed-ports")};
+    () => {
+        include!("allowed-ports")
+    };
 }
 
 #[tokio::main]
 async fn main() {
-    #[cfg(not(debug_assertions))]
-    simple_logger::init_with_level(Level::Trace).unwrap();
-    
+    #[cfg(debug_assertions)]
+    simple_logger::init_with_level(log::Level::Trace).unwrap();
+
     let listener = TcpListener::bind((Ipv6Addr::UNSPECIFIED, 0)).await.unwrap();
 
     let port_filter = Filter::<Port>::new(&port_whitelist!(), FilterMode::WhiteList);
