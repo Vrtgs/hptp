@@ -129,7 +129,7 @@ struct CliArgs {
 async fn main() {
     #[cfg(debug_assertions)]
     simple_logger::init_with_level(log::Level::Trace).unwrap();
-    
+
     let args = CliArgs::parse();
     let allow = match (args.ipv4, args.ipv6) {
         (true, false) => AllowProtocol::Ipv4,
@@ -138,11 +138,11 @@ async fn main() {
         (false, false) => panic!("must have at least one of --ipv4 or --ipv6 flags"),
     };
 
-    let ports = parse_array(args.ports).expect("invalid ports allow array");
+    let ports = &*Box::leak(parse_array(args.ports).expect("invalid ports allow array"));
 
     let host = &*args.host.leak();
 
     log::info!("Started listening on ip {allow} on ports [{ports:?}] and forwarding to {host}");
-    
-    listen(&ports, host, allow).await.unwrap()
+
+    listen(ports, host, allow).await.unwrap()
 }
