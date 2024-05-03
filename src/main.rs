@@ -83,7 +83,7 @@ fn parse_array(str: impl AsRef<str>) -> Option<Box<[u16]>> {
                 s.parse::<u16>().ok().map(One).or_else(|| {
                     let parse_range =
                         |(s1, s2): (&str, &str)| {
-                            Some((s1.parse().ok()?, s2.parse().ok()?));
+                            Some((s1.parse().ok()?, s2.parse().ok()?))
                         };
                     s.split_once("..")
                         .and_then(parse_range)
