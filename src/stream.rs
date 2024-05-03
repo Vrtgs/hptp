@@ -21,13 +21,13 @@ impl ManyTcpListener {
                     .map(Self)
             };
         }
-        
+
         let stream = futures::stream::iter(addrs.into_iter().map(Into::into))
             .map(|addr| async move { Ok((TcpListener::bind(addr).await?, addr)) });
-        
+
         match bind_concurrent {
             2.. => collect_into_self!(stream.buffer_unordered(bind_concurrent)),
-            _   => collect_into_self!(stream.then(|x| x))
+            _ => collect_into_self!(stream.then(|x| x)),
         }
     }
 
