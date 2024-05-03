@@ -12,13 +12,23 @@ impl ManyTcpListener {
         addrs: impl IntoIterator<Item = A>,
         bind_concurrent: usize,
     ) -> io::Result<Self> {
-        futures::stream::iter(addrs.into_iter().map(Into::into))
-            .map(|addr| async move { Ok((TcpListener::bind(addr).await?, addr)) })
-            .buffer_unordered(bind_concurrent.max(1))
-            .try_collect::<Vec<_>>()
-            .await
-            .map(Vec::into_boxed_slice)
-            .map(Self)
+        macro_rules! collect_into_self {
+            ($stream: expr) => {
+                $stream
+                    .try_collect::<Vec<_>>()
+                    .await
+                    .map(Vec::into_boxed_slice)
+                    .map(Self)
+            };
+        }
+        
+        let stream = futures::stream::iter(addrs.into_iter().map(Into::into))
+            .map(|addr| async move { Ok((TcpListener::bind(addr).await?, addr)) });
+        
+        match bind_concurrent {
+            2.. => collect_into_self!(stream.buffer_unordered(bind_concurrent)),
+            _   => collect_into_self!(stream.then(|x| x))
+        }
     }
 
     pub fn poll_accept(
