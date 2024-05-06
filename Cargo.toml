@@ -29,6 +29,7 @@ futures = "0.3.30"
 rand = "0.9.0-alpha.1"
 clap = { version = "4.5.4", features = ["derive"] }
 strum = { version = "0.26.2", features = ["derive"] }
+smallvec = { version = "2.0.0-alpha.5", features = ["write"] }
 
 [dependencies.simple_logger]
 version = "5.0.0"

@@ -315,6 +315,7 @@ dependencies = [
  "log",
  "rand",
  "simple_logger",
+ "smallvec 2.0.0-alpha.5",
  "strum",
  "tokio",
 ]
@@ -432,7 +433,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "redox_syscall",
- "smallvec",
+ "smallvec 1.13.2",
  "windows-targets 0.48.5",
 ]
 
@@ -591,6 +592,12 @@ name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
+
+[[package]]
+name = "smallvec"
+version = "2.0.0-alpha.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24bd433ebbd599a277e9e73bf6220f3193842551fab233949b7254306dccdac1"
 
 [[package]]
 name = "socket2"

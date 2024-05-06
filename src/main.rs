@@ -3,8 +3,10 @@ use clap::Parser;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::io;
 use tokio::net::TcpStream;
+use crate::host::Host;
 
 mod stream;
+mod host;
 
 #[derive(strum::Display)]
 enum AllowProtocol {
@@ -16,28 +18,31 @@ enum AllowProtocol {
     Both,
 }
 
-async fn listen(ports: &[u16], addr: &'static str, allow: AllowProtocol) -> io::Result<()> {
-    let mut listener = match allow {
-        prot @ (AllowProtocol::Ipv4 | AllowProtocol::Ipv6) => {
-            let addr = match prot {
-                AllowProtocol::Ipv4 => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-                AllowProtocol::Ipv6 => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
-                _ => unreachable!(),
-            };
+async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result<()> {
+    let mut listener = {
+        let len = ports.len();
+        match allow {
+            prot @ (AllowProtocol::Ipv4 | AllowProtocol::Ipv6) => {
+                let addr = match prot {
+                    AllowProtocol::Ipv4 => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                    AllowProtocol::Ipv6 => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+                    _ => unreachable!(),
+                };
 
-            ManyTcpListener::bind(ports.iter().map(|&port| (addr, port)), ports.len()).await?
-        }
-        AllowProtocol::Both => {
-            ManyTcpListener::bind(
-                ports.iter().flat_map(|&port| {
-                    [
-                        SocketAddr::from((Ipv4Addr::UNSPECIFIED, port)),
-                        SocketAddr::from((Ipv6Addr::UNSPECIFIED, port)),
-                    ]
-                }),
-                ports.len() * 2,
-            )
-            .await?
+                ManyTcpListener::bind(ports.into_iter().map(|port| (addr, port)), len).await?
+            }
+            AllowProtocol::Both => {
+                ManyTcpListener::bind(
+                    ports.into_iter().flat_map(|port| {
+                        [
+                            SocketAddr::from((Ipv4Addr::UNSPECIFIED, port)),
+                            SocketAddr::from((Ipv6Addr::UNSPECIFIED, port)),
+                        ]
+                    }),
+                    len * 2,
+                )
+                .await?
+            }
         }
     };
 
@@ -56,7 +61,7 @@ async fn listen(ports: &[u16], addr: &'static str, allow: AllowProtocol) -> io::
         tokio::spawn(async move {
             io::copy_bidirectional(
                 &mut stream,
-                &mut TcpStream::connect((addr, local_port)).await?,
+                &mut TcpStream::connect(&*host.to_hosts(local_port).await?).await?,
             )
             .await
             .inspect_err(|e| log::debug!("Error during copy: {e}"))
@@ -65,7 +70,7 @@ async fn listen(ports: &[u16], addr: &'static str, allow: AllowProtocol) -> io::
     }
 }
 
-fn parse_array(str: impl AsRef<str>) -> Option<Box<[u16]>> {
+fn parse_array(str: impl AsRef<str>) -> Option<Vec<u16>> {
     str.as_ref()
         .trim()
         .strip_prefix('[')
@@ -106,7 +111,7 @@ fn parse_array(str: impl AsRef<str>) -> Option<Box<[u16]>> {
             nums.sort_unstable();
             nums.dedup();
 
-            Some(nums.into_boxed_slice())
+            Some(nums)
         })
 }
 
@@ -138,11 +143,11 @@ async fn main() {
         (false, false) => panic!("must have at least one of --ipv4 or --ipv6 flags"),
     };
 
-    let ports = &*Box::leak(parse_array(args.ports).expect("invalid ports allow array"));
+    let ports = parse_array(args.ports).expect("invalid ports allow array");
 
-    let host = &*args.host.leak();
+    let host = Host::new(args.host);
 
-    log::info!("Started listening on ip {allow} on ports [{ports:?}] and forwarding to {host}");
+    log::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
 
     listen(ports, host, allow).await.unwrap()
 }
