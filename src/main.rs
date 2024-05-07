@@ -74,7 +74,8 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
                 let mut forward_stream = timeout(Duration::from_secs(15), async {
                     TcpStream::connect(&*host.to_hosts(local_port).await?).await
                 })
-                .await.inspect_err(|_| log::debug!("connecting to {host} timed out"))??;
+                .await
+                .inspect_err(|_| log::debug!("connecting to {host} timed out"))??;
                 io::copy_bidirectional(&mut stream, &mut forward_stream).await
             }
             .await;
@@ -164,15 +165,18 @@ async fn real_main() -> ! {
 
     log::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
 
-    listen(ports, host, allow).await.unwrap_or_else(|err| {
-        log::error!("FATAL ERROR: {err}");
-        std::process::abort()
-    }).never()
+    listen(ports, host, allow)
+        .await
+        .unwrap_or_else(|err| {
+            log::error!("FATAL ERROR: {err}");
+            std::process::abort()
+        })
+        .never()
 }
 
 fn main() -> ! {
     simple_logger::init_with_level(log::Level::Trace).unwrap();
-    
+
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .on_thread_start(|| {
