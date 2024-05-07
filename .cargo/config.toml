@@ -1,3 +1,2 @@
-# macOS cross compilation fix https://github.com/FiloSottile/homebrew-musl-cross
 [target.x86_64-unknown-linux-musl]
-linker = "x86_64-linux-musl-gcc"
+linker = "rust-lld"
