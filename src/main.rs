@@ -1,12 +1,13 @@
+use crate::host::Host;
 use crate::stream::ManyTcpListener;
 use clap::Parser;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::io;
 use tokio::net::TcpStream;
-use crate::host::Host;
 
-mod stream;
+mod dns_resolver;
 mod host;
+mod stream;
 
 #[derive(strum::Display)]
 enum AllowProtocol {
@@ -18,7 +19,16 @@ enum AllowProtocol {
     Both,
 }
 
-async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result<()> {
+enum Never {}
+
+impl Never {
+    fn never(self) -> ! {
+        match self {}
+    } 
+}
+
+
+async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result<Never> {
     let mut listener = {
         let len = ports.len();
         match allow {
@@ -130,8 +140,7 @@ struct CliArgs {
     ports: String,
 }
 
-#[tokio::main]
-async fn main() {
+async fn real_main() -> ! {
     #[cfg(debug_assertions)]
     simple_logger::init_with_level(log::Level::Trace).unwrap();
 
@@ -149,5 +158,15 @@ async fn main() {
 
     log::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
 
-    listen(ports, host, allow).await.unwrap()
+    listen(ports, host, allow).await.unwrap().never()
+}
+
+
+fn main() -> ! {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .on_thread_start(|| {rand::thread_rng();})
+        .build()
+        .expect("runtime builder failed")
+        .block_on(real_main())
 }

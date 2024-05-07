@@ -39,10 +39,12 @@ impl ManyTcpListener {
         let item = self
             .0
             .iter_mut()
-            .find_map(|listener| match listener.0.poll_accept(cx) {
-                Poll::Ready(res) => Some(res.map(|(s, p)| (s, listener.1, p))),
-                Poll::Pending => None,
-            });
+            .find_map(
+                |&mut (ref mut listener, local)| match listener.poll_accept(cx) {
+                    Poll::Ready(res) => Some(res.map(|(s, p)| (s, local, p))),
+                    Poll::Pending => None,
+                },
+            );
 
         match item {
             Some(sock) => Poll::Ready(sock),
