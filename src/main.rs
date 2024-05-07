@@ -2,8 +2,10 @@ use crate::host::Host;
 use crate::stream::ManyTcpListener;
 use clap::Parser;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::time::Duration;
 use tokio::io;
 use tokio::net::TcpStream;
+use tokio::time::timeout;
 
 mod dns_resolver;
 mod host;
@@ -69,11 +71,11 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
         let local_port = local.port();
         tokio::spawn(async move {
             let _res = async move {
-                io::copy_bidirectional(
-                    &mut stream,
-                    &mut TcpStream::connect(&*host.to_hosts(local_port).await?).await?,
-                )
-                .await
+                let mut forward_stream = timeout(Duration::from_secs(15), async {
+                    TcpStream::connect(&*host.to_hosts(local_port).await?).await
+                })
+                .await??;
+                io::copy_bidirectional(&mut stream, &mut forward_stream).await
             }
             .await;
 
