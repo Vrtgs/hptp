@@ -74,14 +74,16 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
                 let mut forward_stream = timeout(Duration::from_secs(15), async {
                     TcpStream::connect(&*host.to_hosts(local_port).await?).await
                 })
-                .await??;
+                .await.inspect_err(|_| log::debug!("connecting to {host} timed out"))??;
                 io::copy_bidirectional(&mut stream, &mut forward_stream).await
             }
             .await;
 
             match _res {
-                Ok(m) => log::info!("Completed connection successfully, metrics {m:?}"),
-                Err(e) => log::debug!("Error during copy: {e}"),
+                Ok((c, s)) => log::info!(
+                    "Completed connection successfully, metrics {{ client: {c}, server: {s} }}"
+                ),
+                Err(e) => log::error!("Error during copy: {e}"),
             }
         });
     }
@@ -148,9 +150,6 @@ struct CliArgs {
 }
 
 async fn real_main() -> ! {
-    #[cfg(debug_assertions)]
-    simple_logger::init_with_level(log::Level::Trace).unwrap();
-
     let args = CliArgs::parse();
     let allow = match (args.ipv4, args.ipv6) {
         (true, false) => AllowProtocol::Ipv4,
@@ -165,14 +164,24 @@ async fn real_main() -> ! {
 
     log::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
 
-    listen(ports, host, allow).await.unwrap().never()
+    listen(ports, host, allow).await.unwrap_or_else(|err| {
+        log::error!("FATAL ERROR: {err}");
+        std::process::abort()
+    }).never()
 }
 
 fn main() -> ! {
+    simple_logger::init_with_level(log::Level::Trace).unwrap();
+    
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .on_thread_start(|| {
+            // create thread_rng
+            log::trace!("runtime thread starting...");
             rand::thread_rng();
+        })
+        .on_thread_stop(|| {
+            log::trace!("runtime thread stopping...");
         })
         .build()
         .expect("runtime builder failed")
