@@ -59,13 +59,17 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
 
         let local_port = local.port();
         tokio::spawn(async move {
-            io::copy_bidirectional(
-                &mut stream,
-                &mut TcpStream::connect(&*host.to_hosts(local_port).await?).await?,
-            )
-            .await
-            .inspect_err(|e| log::debug!("Error during copy: {e}"))
-            .inspect(|metrics| log::info!("Completed connection successfully, metrics {metrics:?}"))
+            let _res = async move {
+                io::copy_bidirectional(
+                    &mut stream,
+                    &mut TcpStream::connect(&*host.to_hosts(local_port).await?).await?,
+                ).await
+            }.await;
+
+            match _res {
+                Ok(m) => log::info!("Completed connection successfully, metrics {m:?}"),
+                Err(e) => log::debug!("Error during copy: {e}")
+            }
         });
     }
 }
