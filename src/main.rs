@@ -24,9 +24,8 @@ enum Never {}
 impl Never {
     fn never(self) -> ! {
         match self {}
-    } 
+    }
 }
-
 
 async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result<Never> {
     let mut listener = {
@@ -73,12 +72,14 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
                 io::copy_bidirectional(
                     &mut stream,
                     &mut TcpStream::connect(&*host.to_hosts(local_port).await?).await?,
-                ).await
-            }.await;
+                )
+                .await
+            }
+            .await;
 
             match _res {
                 Ok(m) => log::info!("Completed connection successfully, metrics {m:?}"),
-                Err(e) => log::debug!("Error during copy: {e}")
+                Err(e) => log::debug!("Error during copy: {e}"),
             }
         });
     }
@@ -165,11 +166,12 @@ async fn real_main() -> ! {
     listen(ports, host, allow).await.unwrap().never()
 }
 
-
 fn main() -> ! {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .on_thread_start(|| {rand::thread_rng();})
+        .on_thread_start(|| {
+            rand::thread_rng();
+        })
         .build()
         .expect("runtime builder failed")
         .block_on(real_main())
