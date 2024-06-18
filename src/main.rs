@@ -1,6 +1,7 @@
 use crate::host::Host;
 use crate::stream::ManyTcpListener;
 use clap::Parser;
+use itertools::Itertools;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::Duration;
 use tokio::io;
@@ -104,34 +105,38 @@ fn parse_array(str: impl AsRef<str>) -> Option<Vec<u16>> {
 
             use OneOrRange::*;
 
-            let iter = s.split(',').map(str::trim).map(|s| {
-                s.parse::<u16>().ok().map(One).or_else(|| {
-                    let parse_range =
-                        |(s1, s2): (&str, &str)| Some((s1.parse().ok()?, s2.parse().ok()?));
-                    s.split_once("..")
-                        .and_then(parse_range)
-                        .map(RangeInclusive)
-                        .or_else(|| {
-                            s.split_once("..!=")
-                                .and_then(parse_range)
-                                .map(RangeExclusive)
-                        })
+            let array = s
+                .split(',')
+                .map(str::trim)
+                .map(|s| {
+                    s.parse::<u16>().ok().map(One).or_else(|| {
+                        let parse_range =
+                            |(s1, s2): (&str, &str)| Some((s1.parse().ok()?, s2.parse().ok()?));
+                        s.split_once("..")
+                            .and_then(parse_range)
+                            .map(RangeInclusive)
+                            .or_else(|| {
+                                s.split_once("..!=")
+                                    .and_then(parse_range)
+                                    .map(RangeExclusive)
+                            })
+                    })
                 })
-            });
+                .map(|item| {
+                    Some(match item? {
+                        One(num) => Box::new(std::iter::once(num)) as Box<dyn Iterator<Item = u16>>,
+                        RangeInclusive((start, end)) => Box::new(start..=end),
+                        RangeExclusive((start, end)) => Box::new(start..end),
+                    })
+                })
+                .collect::<Option<Vec<_>>>()?
+                .into_iter()
+                .flatten()
+                .unique()
+                .sorted()
+                .collect();
 
-            let mut nums = vec![];
-            for item in iter {
-                match item? {
-                    One(num) => nums.push(num),
-                    RangeInclusive((start, end)) => nums.extend(start..=end),
-                    RangeExclusive((start, end)) => nums.extend(start..end),
-                }
-            }
-
-            nums.sort_unstable();
-            nums.dedup();
-
-            Some(nums)
+            Some(array)
         })
 }
 
