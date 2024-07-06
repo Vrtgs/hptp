@@ -65,7 +65,7 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
             .inspect(|(_, local, peer)| log::info!("New connection from `{peer}` to `{local}`"));
 
         let Ok((mut stream, local, _)) = res else {
-            log::debug!("connection failed {res:?}");
+            log::warn!("connection failed {res:?}");
             continue;
         };
 
@@ -76,7 +76,9 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
                     TcpStream::connect(&*host.to_hosts(local_port).await?).await
                 })
                 .await
+                .inspect(|_| log::trace!(""))
                 .inspect_err(|_| log::debug!("connecting to {host} timed out"))??;
+
                 io::copy_bidirectional(&mut stream, &mut forward_stream).await
             }
             .await;
@@ -145,18 +147,19 @@ fn parse_array(str: impl AsRef<str>) -> Option<Vec<u16>> {
 #[command(version = "1.0")]
 #[command(about = "high performance tcp proxy", long_about = None)]
 struct CliArgs {
-    #[clap(long)]
+    #[clap(long, alias = "v4")]
     ipv4: bool,
-    #[clap(long)]
+    #[clap(long, alias = "v6")]
     ipv6: bool,
     #[clap(long, value_name = "the host this tcp proxy shall forward to")]
     host: String,
     #[clap(long, short, value_name = "the host this tcp proxy shall forward to")]
     ports: String,
+    #[clap(long, default_value = "WARN")]
+    log: log::LevelFilter
 }
 
-async fn real_main() -> ! {
-    let args = CliArgs::parse();
+async fn real_main(args: CliArgs) -> ! {
     let allow = match (args.ipv4, args.ipv6) {
         (true, false) => AllowProtocol::Ipv4,
         (false, true) => AllowProtocol::Ipv6,
@@ -168,6 +171,8 @@ async fn real_main() -> ! {
 
     let host = Host::new(args.host);
 
+    log::trace!("logging level is {}", dbg!(args.log));
+    
     log::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
 
     listen(ports, host, allow)
@@ -180,7 +185,15 @@ async fn real_main() -> ! {
 }
 
 fn main() -> ! {
-    simple_logger::init_with_level(log::Level::Trace).unwrap();
+    let args = CliArgs::parse();
+    let lvl = match cfg!(debug_assertions) { 
+        true => log::LevelFilter::Trace,
+        false => args.log,
+    };
+    
+    if let Some(lvl) = lvl.to_level() { 
+        simple_logger::init_with_level(lvl).unwrap()
+    }
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -194,5 +207,5 @@ fn main() -> ! {
         })
         .build()
         .expect("runtime builder failed")
-        .block_on(real_main())
+        .block_on(real_main(args))
 }
