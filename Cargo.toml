@@ -1,6 +1,6 @@
 [package]
 name = "hptp"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -21,17 +21,25 @@ edition = "2021"
     strip = false
     lto = "off"
 
+[features]
+default = ["cli"]
+cli = ["dep:clap"]
+
+
 [dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
 log = { version = "0.4.22" }
 arrayvec = "0.7.4"
 futures = "0.3.30"
 rand = "0.9.0-alpha.1"
-clap = { version = "4.5.8", features = ["derive"] }
+clap = { version = "4.5.8", features = ["derive"], optional = true }
 strum = { version = "0.26.3", features = ["derive"] }
 smallvec = { version = "2.0.0-alpha.6", features = ["write"] }
 itertools = "0.13.0"
 hickory-resolver = "0.25.0-alpha.1"
+thiserror = "1.0.61"
+cfg-if = "1.0.0"
+
 
 [dependencies.simple_logger]
 version = "5.0.0"

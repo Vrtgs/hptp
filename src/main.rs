@@ -1,8 +1,8 @@
+use std::fmt::Display;
 use crate::host::Host;
 use crate::stream::ManyTcpListener;
-use clap::Parser;
-use itertools::Itertools;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::sync::Once;
 use std::time::Duration;
 use tokio::io;
 use tokio::net::TcpStream;
@@ -11,6 +11,9 @@ use tokio::time::timeout;
 mod dns_resolver;
 mod host;
 mod stream;
+
+#[cfg(feature = "cli")]
+mod cli;
 
 #[derive(strum::Display)]
 enum AllowProtocol {
@@ -93,112 +96,30 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
     }
 }
 
-fn parse_array(str: impl AsRef<str>) -> Option<Vec<u16>> {
-    str.as_ref()
-        .trim()
-        .strip_prefix('[')
-        .and_then(|s| s.strip_suffix(']'))
-        .and_then(|s| {
-            enum OneOrRange<T> {
-                One(T),
-                RangeInclusive((T, T)),
-                RangeExclusive((T, T)),
-            }
-
-            use OneOrRange::*;
-
-            let array = s
-                .split(',')
-                .map(str::trim)
-                .map(|s| {
-                    s.parse::<u16>().ok().map(One).or_else(|| {
-                        let parse_range =
-                            |(s1, s2): (&str, &str)| Some((s1.parse().ok()?, s2.parse().ok()?));
-                        s.split_once("..")
-                            .and_then(parse_range)
-                            .map(RangeInclusive)
-                            .or_else(|| {
-                                s.split_once("..!=")
-                                    .and_then(parse_range)
-                                    .map(RangeExclusive)
-                            })
-                    })
-                })
-                .map(|item| {
-                    Some(match item? {
-                        One(num) => Box::new(std::iter::once(num)) as Box<dyn Iterator<Item = u16>>,
-                        RangeInclusive((start, end)) => Box::new(start..=end),
-                        RangeExclusive((start, end)) => Box::new(start..end),
-                    })
-                })
-                .collect::<Option<Vec<_>>>()?
-                .into_iter()
-                .flatten()
-                .unique()
-                .sorted()
-                .collect();
-
-            Some(array)
-        })
+pub struct ProgramArgs {
+    ports: Vec<u16>,
+    host: Host,
+    allow: AllowProtocol,
 }
 
-#[derive(Parser)]
-#[command(name = "hptp")]
-#[command(version = "1.0")]
-#[command(about = "high performance tcp proxy", long_about = None)]
-struct CliArgs {
-    #[clap(long, alias = "v4")]
-    ipv4: bool,
-    #[clap(long, alias = "v6")]
-    ipv6: bool,
-    #[clap(long, value_name = "the host this tcp proxy shall forward to")]
-    host: String,
-    #[clap(long, short, value_name = "the host this tcp proxy shall forward to")]
-    ports: String,
-    #[clap(long, default_value = "WARN")]
-    log: log::LevelFilter
-}
-
-async fn real_main(args: CliArgs) -> ! {
-    let allow = match (args.ipv4, args.ipv6) {
-        (true, false) => AllowProtocol::Ipv4,
-        (false, true) => AllowProtocol::Ipv6,
-        (true, true) => AllowProtocol::Both,
-        (false, false) => panic!("must have at least one of --ipv4 or --ipv6 flags"),
-    };
-
-    let ports = parse_array(args.ports).expect("invalid ports allow array");
-
-    let host = Host::new(args.host);
-
-    log::trace!("logging level is {}", dbg!(args.log));
-    
-    log::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
-
-    listen(ports, host, allow)
+pub async fn real_main(args: ProgramArgs) -> ! {
+    listen(args.ports, args.host, args.allow)
         .await
+        .map(Never::never)
         .unwrap_or_else(|err| {
-            log::error!("FATAL ERROR: {err}");
+            log::error!("FATAL: {err}");
             std::process::abort()
         })
-        .never()
 }
 
-fn main() -> ! {
-    let args = CliArgs::parse();
-    let lvl = match cfg!(debug_assertions) { 
-        true => log::LevelFilter::Trace,
-        false => args.log,
-    };
-    
-    if let Some(lvl) = lvl.to_level() { 
-        simple_logger::init_with_level(lvl).unwrap()
-    }
+pub fn build_runtime(mut builder: tokio::runtime::Builder) -> tokio::runtime::Runtime {
+    // make sure thread rng is init
+    // and run tracing metrics
+    rand::thread_rng();
 
-    tokio::runtime::Builder::new_multi_thread()
+    builder
         .enable_all()
         .on_thread_start(|| {
-            // create thread_rng
             log::trace!("runtime thread starting...");
             rand::thread_rng();
         })
@@ -207,5 +128,39 @@ fn main() -> ! {
         })
         .build()
         .expect("runtime builder failed")
-        .block_on(real_main(args))
+}
+
+pub fn set_panic_hook() {
+    static SET_ONCE: Once = Once::new();
+    
+    SET_ONCE.call_once(|| {
+        std::panic::set_hook(Box::new(|info| {
+            let location = info
+                .location()
+                .map(|x| x as &dyn Display)
+                .unwrap_or_else(|| &"<unknown file>");
+            let msg = match info.payload().downcast_ref::<&str>() {
+                Some(s) => s,
+                None => match info.payload().downcast_ref::<String>() {
+                    Some(s) => s,
+                    None => "Box<dyn Any>",
+                },
+            };
+            
+            log::error!("FATAL: panicked at {location}: [{msg}]")
+        }))
+    })
+}
+
+
+fn main() {
+    set_panic_hook();
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "cli")] {
+            cli::main()
+        } else {
+            compile_error!("Unknown startup point")
+        }
+    }
 }
