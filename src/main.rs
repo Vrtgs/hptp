@@ -1,12 +1,14 @@
 use std::fmt::Display;
-use crate::host::Host;
-use crate::stream::ManyTcpListener;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Once;
 use std::time::Duration;
+
 use tokio::io;
 use tokio::net::TcpStream;
 use tokio::time::timeout;
+
+use crate::host::Host;
+use crate::stream::ManyTcpListener;
 
 mod dns_resolver;
 mod host;
@@ -79,7 +81,7 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
                     TcpStream::connect(&*host.to_hosts(local_port).await?).await
                 })
                 .await
-                .inspect(|_| log::trace!(""))
+                .inspect(|_| log::trace!("successfully connected to {host}"))
                 .inspect_err(|_| log::debug!("connecting to {host} timed out"))??;
 
                 io::copy_bidirectional(&mut stream, &mut forward_stream).await
@@ -132,7 +134,7 @@ pub fn build_runtime(mut builder: tokio::runtime::Builder) -> tokio::runtime::Ru
 
 pub fn set_panic_hook() {
     static SET_ONCE: Once = Once::new();
-    
+
     SET_ONCE.call_once(|| {
         std::panic::set_hook(Box::new(|info| {
             let location = info
@@ -146,12 +148,11 @@ pub fn set_panic_hook() {
                     None => "Box<dyn Any>",
                 },
             };
-            
+
             log::error!("FATAL: panicked at {location}: [{msg}]")
         }))
     })
 }
-
 
 fn main() {
     set_panic_hook();

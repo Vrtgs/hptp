@@ -8,7 +8,7 @@ use crate::{build_runtime, real_main, AllowProtocol, ProgramArgs};
 
 #[derive(Parser)]
 #[command(name = "hptp")]
-#[command(version = "1.0")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "high performance tcp proxy", long_about = None)]
 pub struct CliArgs {
     #[clap(long, alias = "v4")]
@@ -52,9 +52,9 @@ impl FromStr for RuntimeType {
 #[derive(thiserror::Error, Debug)]
 #[error(
     "invalid ports array, \
-expected [$(<ELM>),+] where <ELM> can be a port number, \
-inclusive range x..y, or an exclusive range x..!=y\
-"
+    expected [$(<ELM>),+] where <ELM> can be a port number, \
+    inclusive range x..y, or an exclusive range x..!=y\
+    "
 )]
 struct PortsArrayParseError(());
 
@@ -142,7 +142,7 @@ pub fn main() -> ! {
     let ports = args.ports.0;
     let host = Host::new(args.host);
 
-    log::trace!("logging level is {}", args.log);
+    log::info!("logging level is {}", args.log);
 
     log::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
 
