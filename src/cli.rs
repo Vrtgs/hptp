@@ -1,8 +1,10 @@
-use crate::host::Host;
-use crate::{build_runtime, real_main, AllowProtocol, ProgramArgs};
+use std::str::FromStr;
+
 use clap::Parser;
 use itertools::Itertools;
-use std::str::FromStr;
+
+use crate::host::Host;
+use crate::{build_runtime, real_main, AllowProtocol, ProgramArgs};
 
 #[derive(Parser)]
 #[command(name = "hptp")]
@@ -30,7 +32,7 @@ enum RuntimeType {
 }
 
 #[derive(thiserror::Error, Debug)]
-#[error("invalid runtime, expected 'single' or 'multi'")]
+#[error("invalid runtime, expected 'single-threaded' or 'multi-threaded'")]
 struct RuntimeTypeParseError(());
 
 impl FromStr for RuntimeType {
@@ -49,7 +51,7 @@ impl FromStr for RuntimeType {
 
 #[derive(thiserror::Error, Debug)]
 #[error(
-"invalid ports array, \
+    "invalid ports array, \
 expected [$(<ELM>),+] where <ELM> can be a port number, \
 inclusive range x..y, or an exclusive range x..!=y\
 "
@@ -63,8 +65,7 @@ impl FromStr for PortsArray {
     type Err = PortsArrayParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s
-            .trim()
+        s.trim()
             .strip_prefix('[')
             .and_then(|s| s.strip_suffix(']'))
             .and_then(|s| {
@@ -95,7 +96,9 @@ impl FromStr for PortsArray {
                     })
                     .map(|item| {
                         Some(match item? {
-                            One(num) => Box::new(std::iter::once(num)) as Box<dyn Iterator<Item = u16>>,
+                            One(num) => {
+                                Box::new(std::iter::once(num)) as Box<dyn Iterator<Item = u16>>
+                            }
                             RangeInclusive((start, end)) => Box::new(start..=end),
                             RangeExclusive((start, end)) => Box::new(start..end),
                         })
@@ -115,7 +118,6 @@ impl FromStr for PortsArray {
     }
 }
 
-
 pub fn main() -> ! {
     let args = CliArgs::parse();
     let lvl = match cfg!(debug_assertions) {
@@ -134,9 +136,9 @@ pub fn main() -> ! {
         (false, false) => {
             eprintln!("must have at least one of --ipv4 or --ipv6 flags");
             std::process::abort()
-        },
+        }
     };
-    
+
     let ports = args.ports.0;
     let host = Host::new(args.host);
 
