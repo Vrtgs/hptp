@@ -1,7 +1,11 @@
+use std::io::IsTerminal;
+use std::iter::FusedIterator;
 use std::str::FromStr;
+use std::{io, ops};
 
 use clap::Parser;
 use itertools::Itertools;
+use tracing::level_filters::LevelFilter;
 
 use crate::host::Host;
 use crate::{build_runtime, real_main, AllowProtocol, ProgramArgs};
@@ -16,11 +20,11 @@ pub struct CliArgs {
     #[clap(long, alias = "v6")]
     ipv6: bool,
     #[clap(long, value_name = "the host this proxy shall forward to")]
-    host: String,
+    host: Host,
     #[clap(long, short, value_name = "the ports this proxy shall forward")]
     ports: PortsArray,
-    #[clap(long, default_value = "WARN")]
-    log: log::LevelFilter,
+    #[clap(long)]
+    log: Option<LevelFilter>,
     #[clap(long, default_value = "single-threaded")]
     runtime: RuntimeType,
 }
@@ -56,9 +60,11 @@ impl FromStr for RuntimeType {
     inclusive range x..y, or an exclusive range x..!=y\
     "
 )]
+#[cfg_attr(test, derive(PartialEq))]
 struct PortsArrayParseError(());
 
 #[derive(Clone)]
+#[cfg_attr(test, derive(Debug, Ord, PartialOrd, Eq, PartialEq))]
 struct PortsArray(Vec<u16>);
 
 impl FromStr for PortsArray {
@@ -71,11 +77,27 @@ impl FromStr for PortsArray {
             .and_then(|s| {
                 enum OneOrRange<T> {
                     One(T),
-                    RangeInclusive((T, T)),
-                    RangeExclusive((T, T)),
+                    RangeInclusive(ops::RangeInclusive<T>),
+                    RangeExclusive(ops::Range<T>),
                 }
-
                 use OneOrRange::*;
+
+                impl Iterator for OneOrRange<u16> {
+                    type Item = u16;
+
+                    fn next(&mut self) -> Option<Self::Item> {
+                        match *self {
+                            One(one) => {
+                                // empty
+                                *self = RangeExclusive(0..0);
+                                Some(one)
+                            }
+                            RangeInclusive(ref mut range) => range.next(),
+                            RangeExclusive(ref mut range) => range.next(),
+                        }
+                    }
+                }
+                impl FusedIterator for OneOrRange<u16> {}
 
                 let array = s
                     .split(',')
@@ -86,21 +108,12 @@ impl FromStr for PortsArray {
                                 |(s1, s2): (&str, &str)| Some((s1.parse().ok()?, s2.parse().ok()?));
                             s.split_once("..")
                                 .and_then(parse_range)
-                                .map(RangeInclusive)
+                                .map(|(x, y)| RangeInclusive(x..=y))
                                 .or_else(|| {
                                     s.split_once("..!=")
                                         .and_then(parse_range)
-                                        .map(RangeExclusive)
+                                        .map(|(x, y)| RangeExclusive(x..y))
                                 })
-                        })
-                    })
-                    .map(|item| {
-                        Some(match item? {
-                            One(num) => {
-                                Box::new(std::iter::once(num)) as Box<dyn Iterator<Item = u16>>
-                            }
-                            RangeInclusive((start, end)) => Box::new(start..=end),
-                            RangeExclusive((start, end)) => Box::new(start..end),
                         })
                     })
                     .collect::<Option<Vec<_>>>()?
@@ -120,13 +133,22 @@ impl FromStr for PortsArray {
 
 pub fn main() -> ! {
     let args = CliArgs::parse();
-    let lvl = match cfg!(debug_assertions) {
-        true => log::LevelFilter::Trace,
-        false => args.log,
-    };
+    let log_lvl = args.log.unwrap_or(
+        const {
+            match cfg!(debug_assertions) {
+                true => LevelFilter::TRACE,
+                false => LevelFilter::WARN,
+            }
+        },
+    );
 
-    if let Some(lvl) = lvl.to_level() {
-        simple_logger::init_with_level(lvl).unwrap()
+    if let Some(lvl) = log_lvl.into_level() {
+        tracing_subscriber::fmt()
+            .with_ansi(io::stdout().is_terminal())
+            .with_max_level(lvl)
+            .with_target(false)
+            .compact()
+            .init()
     }
 
     let allow = match (args.ipv4, args.ipv6) {
@@ -134,21 +156,59 @@ pub fn main() -> ! {
         (false, true) => AllowProtocol::Ipv6,
         (true, true) => AllowProtocol::Both,
         (false, false) => {
-            eprintln!("must have at least one of --ipv4 or --ipv6 flags");
-            std::process::abort()
+            panic!("must have at least one of --ipv4 or --ipv6 flags")
         }
     };
 
     let ports = args.ports.0;
-    let host = Host::new(args.host);
+    let host = args.host;
 
-    log::info!("logging level is {}", args.log);
+    tracing::info!("logging level is {}", log_lvl);
 
-    log::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
+    tracing::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
 
     build_runtime(match args.runtime {
         RuntimeType::CurrentThread => tokio::runtime::Builder::new_current_thread(),
         RuntimeType::MultiThreaded => tokio::runtime::Builder::new_multi_thread(),
     })
     .block_on(real_main(ProgramArgs { ports, host, allow }))
+}
+
+#[cfg(test)]
+mod test_port_array {
+    use super::*;
+
+    #[test]
+    fn test_valid_ports_array() {
+        // Test valid input strings and expected PortsArray values
+        assert_eq!(
+            "[80, 443, 20..24, 8080]".parse::<PortsArray>(),
+            Ok(PortsArray(
+                [80, 443]
+                    .into_iter()
+                    .chain(20..=24)
+                    .chain([8080])
+                    .unique()
+                    .sorted()
+                    .collect()
+            ))
+        );
+        assert_eq!(
+            format!("[0..{}]", u16::MAX).parse::<PortsArray>(),
+            Ok(PortsArray((0..=u16::MAX).collect()))
+        );
+        assert_eq!(
+            format!("[0..!={}]", u16::MAX).parse::<PortsArray>(),
+            Ok(PortsArray((0..u16::MAX).collect()))
+        );
+    }
+
+    #[test]
+    fn test_invalid_ports_array() {
+        // Test invalid input strings
+        assert!("[]".parse::<PortsArray>().is_err());
+        assert!("[80, 443, abc]".parse::<PortsArray>().is_err());
+        assert!("[80..=abc]".parse::<PortsArray>().is_err());
+        assert!("[80..!=100..=200]".parse::<PortsArray>().is_err());
+    }
 }
