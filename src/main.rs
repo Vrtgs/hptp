@@ -5,6 +5,7 @@ use std::time::Duration;
 use tokio::io;
 use tokio::net::TcpStream;
 use tokio::time::timeout;
+use tokio_splice::zero_copy_bidirectional;
 use tracing::instrument;
 
 use crate::host::Host;
@@ -45,7 +46,7 @@ async fn copy_to(host: Host, port: u16, mut stream: TcpStream, _peer: SocketAddr
         .inspect(|_| tracing::trace!("Successfully connected to {host}"))
         .inspect_err(|_| tracing::debug!("Connecting to {host} timed out"))??;
 
-        io::copy_bidirectional(&mut stream, &mut forward_stream).await
+        zero_copy_bidirectional(&mut stream, &mut forward_stream).await
     }
     .await;
 
