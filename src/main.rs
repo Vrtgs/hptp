@@ -5,7 +5,6 @@ use std::time::Duration;
 use tokio::io;
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-use tokio_splice::zero_copy_bidirectional;
 use tracing::instrument;
 
 use crate::host::Host;
@@ -17,6 +16,7 @@ mod stream;
 
 #[cfg(feature = "cli")]
 mod cli;
+mod sock_io;
 
 #[derive(strum::Display)]
 enum AllowProtocol {
@@ -46,7 +46,7 @@ async fn copy_to(host: Host, port: u16, mut stream: TcpStream, _peer: SocketAddr
         .inspect(|_| tracing::trace!("Successfully connected to {host}"))
         .inspect_err(|_| tracing::debug!("Connecting to {host} timed out"))??;
 
-        zero_copy_bidirectional(&mut stream, &mut forward_stream).await
+        sock_io::copy_socks(&mut stream, &mut forward_stream).await
     }
     .await;
 

@@ -28,7 +28,6 @@ cli = ["dep:clap"]
 
 [dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
-tokio-splice = "0.2.1"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 arrayvec = "0.7.4"
@@ -42,3 +41,6 @@ hickory-resolver = "0.25.0-alpha.1"
 thiserror = "1.0.62"
 cfg-if = "1.0.0"
 url = "2.5.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+tokio-splice = "0.2.1"
