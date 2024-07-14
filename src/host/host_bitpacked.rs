@@ -68,7 +68,6 @@ impl Host {
 
     pub(super) fn as_repr(self) -> HostRpr {
         // TODO: strict provence
-
         let bits = self.ptr.as_ptr() as usize;
         match bits & TAG_MASK {
             IP_TAG => HostRpr::Static(unsafe { self.as_ip_ref() }),
@@ -143,15 +142,9 @@ mod tests {
         test_ip!(IpAddr::V6(Ipv6Addr::new(12, 1, 221, 91, 61, 881, 1, 8881)));
     }
 
-    #[cfg(not(miri))]
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn name_works() {
-        #[cfg(all(miri, windows))]
-        // Safety: set_var is always safe in windows
-        unsafe {
-            std::env::set_var("SystemRoot", r"C:\WINDOWS");
-        }
-
         macro_rules! test_host {
             ($name: expr) => {{
                 static HOST: OnceLock<DynamicHost> = OnceLock::new();

@@ -167,11 +167,12 @@ pub fn main() -> ! {
 
     tracing::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
 
-    build_runtime(match args.runtime {
+    let runtime_builder = match args.runtime {
         RuntimeType::CurrentThread => tokio::runtime::Builder::new_current_thread(),
         RuntimeType::MultiThreaded => tokio::runtime::Builder::new_multi_thread(),
-    })
-    .block_on(real_main(ProgramArgs { ports, host, allow }))
+    };
+
+    build_runtime(runtime_builder).block_on(real_main(ProgramArgs { ports, host, allow }))
 }
 
 #[cfg(test)]
@@ -179,6 +180,8 @@ mod test_port_array {
     use super::*;
 
     #[test]
+    // too slow on miri, and there is no unsafe to test
+    #[cfg_attr(miri, ignore)]
     fn test_valid_ports_array() {
         // Test valid input strings and expected PortsArray values
         assert_eq!(

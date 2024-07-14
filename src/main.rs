@@ -18,6 +18,10 @@ mod stream;
 mod cli;
 mod sock_io;
 
+#[cfg(any(windows, target_os = "linux"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[derive(strum::Display)]
 enum AllowProtocol {
     #[strum(to_string = "0.0.0.0")]
