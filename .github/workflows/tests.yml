@@ -1,5 +1,8 @@
 name: cargo test
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [master]
