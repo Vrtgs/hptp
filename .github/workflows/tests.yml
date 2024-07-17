@@ -18,4 +18,4 @@ jobs:
           toolchain: stable
           profile: minimal
       - name: Run tests
-        run: tree
+        run: tree .
