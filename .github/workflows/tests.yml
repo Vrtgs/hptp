@@ -1,5 +1,8 @@
 name: cargo test
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [master]
@@ -17,5 +20,7 @@ jobs:
         with:
           toolchain: stable
           profile: minimal
-      - name: Run tests
-        run: tree ../..
+      - name: cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
