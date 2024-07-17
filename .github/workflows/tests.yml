@@ -1,8 +1,5 @@
 name: cargo test
 
-permissions:
-  contents: read
-
 on:
   push:
     branches: [master]
@@ -19,7 +16,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          profile: minimal
       - name: cargo test
         uses: actions-rs/cargo@v1
         with:
