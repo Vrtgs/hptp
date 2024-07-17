@@ -1,59 +1,80 @@
-use futures::{StreamExt, TryStreamExt};
-use rand::seq::SliceRandom;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
+
+use futures::{stream, StreamExt, TryStreamExt};
+use rand::seq::SliceRandom;
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 
-pub struct ManyTcpListener(Box<[(TcpListener, SocketAddr)]>);
+struct ShuffleLimit(u16);
+
+impl ShuffleLimit {
+    fn try_shuffle<F: FnOnce()>(&mut self, f: F) {
+        let (cnt, overflow) = self.0.overflowing_add(1);
+        if overflow {
+            f()
+        }
+        // if a panic happened don't count it
+        self.0 = cnt;
+    }
+}
+
+pub struct ManyTcpListener {
+    listeners: Box<[(TcpListener, SocketAddr)]>,
+    shuffle_limit: ShuffleLimit,
+}
 
 impl ManyTcpListener {
     pub async fn bind<A: Into<SocketAddr>>(
         addrs: impl IntoIterator<Item = A>,
         bind_concurrent: usize,
     ) -> io::Result<Self> {
-        macro_rules! collect_into_self {
-            ($stream: expr) => {
-                $stream
+        let stream = stream::iter(addrs.into_iter().map(Into::into))
+            .map(|addr| async move { TcpListener::bind(addr).await.map(|l| (l, addr)) });
+
+        let mut listeners = match bind_concurrent {
+            2.. => {
+                stream
+                    .buffer_unordered(bind_concurrent)
                     .try_collect::<Vec<_>>()
                     .await
-                    .map(Vec::into_boxed_slice)
-                    .map(Self)
-            };
-        }
+            }
+            _ => stream.then(|x| x).try_collect::<Vec<_>>().await,
+        }?
+        .into_boxed_slice();
 
-        let stream = futures::stream::iter(addrs.into_iter().map(Into::into))
-            .map(|addr| async move { Ok((TcpListener::bind(addr).await?, addr)) });
+        listeners.shuffle(&mut rand::thread_rng());
 
-        match bind_concurrent {
-            2.. => collect_into_self!(stream.buffer_unordered(bind_concurrent)),
-            _ => collect_into_self!(stream.then(|x| x)),
-        }
+        Ok(Self {
+            listeners,
+            shuffle_limit: ShuffleLimit(0),
+        })
     }
 
     pub fn poll_accept(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<(TcpStream, SocketAddr, SocketAddr)>> {
-        self.0.shuffle(&mut rand::thread_rng());
-        let item = self
-            .0
-            .iter_mut()
-            .find_map(
-                |&mut (ref mut listener, local)| match listener.poll_accept(cx) {
-                    Poll::Ready(res) => Some(res.map(|(s, p)| (s, local, p))),
-                    Poll::Pending => None,
-                },
-            );
-
-        match item {
-            Some(sock) => Poll::Ready(sock),
-            None => Poll::Pending,
+        #[inline(always)]
+        fn select<T, B, F: FnMut(&mut T) -> Poll<B>>(slice: &mut [T], mut f: F) -> Poll<B> {
+            for x in slice {
+                if let res @ Poll::Ready(..) = f(x) {
+                    return res;
+                }
+            }
+            Poll::Pending
         }
+
+        self.shuffle_limit
+            .try_shuffle(|| self.listeners.shuffle(&mut rand::thread_rng()));
+
+        select(&mut self.listeners, |(listener, local)| {
+            listener.poll_accept(cx).map_ok(|(s, p)| (s, *local, p))
+        })
     }
 
     /// this returns
-    /// (<established TcpStream between <local> and <remote>>, <local>, <remote>)
+    /// ((established TcpStream between \<local\> and \<remote\>), \<local\>, \<remote\>)
     pub async fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr, SocketAddr)> {
         std::future::poll_fn(|cx| self.poll_accept(cx)).await
     }

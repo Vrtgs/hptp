@@ -152,12 +152,9 @@ pub fn main() -> ! {
     }
 
     let allow = match (args.ipv4, args.ipv6) {
-        (true, false) => AllowProtocol::Ipv4,
+        (false, false) | (true, false) => AllowProtocol::Ipv4,
         (false, true) => AllowProtocol::Ipv6,
         (true, true) => AllowProtocol::Both,
-        (false, false) => {
-            panic!("must have at least one of --ipv4 or --ipv6 flags")
-        }
     };
 
     let ports = args.ports.0;
