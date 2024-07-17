@@ -15,6 +15,7 @@ jobs:
     steps:
       - uses: actions-rs/toolchain@v1
         with:
+          toolchain: stable
           profile: minimal
       - name: cargo test
         uses: actions-rs/cargo@v1
