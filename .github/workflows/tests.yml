@@ -13,7 +13,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - name: Set up rust
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
