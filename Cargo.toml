@@ -33,7 +33,7 @@ tracing-subscriber = "0.3.18"
 arrayvec = "0.7.4"
 futures = "0.3.30"
 rand = "0.9.0-alpha.1"
-clap = { version = "4.5.11", features = ["derive"], optional = true }
+clap = { version = "4.5.13", features = ["derive"], optional = true }
 strum = { version = "0.26.3", features = ["derive"] }
 smallvec = { version = "2.0.0-alpha.6", features = ["write"] }
 itertools = "0.13.0"
