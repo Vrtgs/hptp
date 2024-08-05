@@ -16,7 +16,7 @@ hptp is a high-performance TCP proxy designed to forward traffic to a specified 
 - `--v6` (alias: `--ipv6`): Enable IPv6.
 - `--host <HOST>`: Specify the host to forward traffic to.
 - `--ports <PORTS>`: Specify the ports to forward traffic to.
-- `--runtime <Runtime type>` (alias: `--rt`): Specify runtime.
+- `--runtime <Runtime type>` (alias: `--rt`): Specify runtime (default `single-threaded`).
 
 by default if neither `--v4` or `--v6` are specified, `--v4` is enabled
 
