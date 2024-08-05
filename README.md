@@ -6,6 +6,7 @@ hptp is a high-performance TCP proxy designed to forward traffic to a specified 
 - Supports both IPv4 and IPv6.
 - Configurable logging levels.
 - Choice between single-threaded and multi-threaded runtime.
+- Fast and efficient, using splice sys calls on linux.
 
 ## Usage
 
@@ -15,11 +16,14 @@ hptp is a high-performance TCP proxy designed to forward traffic to a specified 
 - `--v6` (alias: `--ipv6`): Enable IPv6.
 - `--host <HOST>`: Specify the host to forward traffic to.
 - `--ports <PORTS>`: Specify the ports to forward traffic to.
+- `--runtime <Runtime type>` (alias: `--rt`): Specify runtime.
+
+by default if neither `--v4` or `--v6` are specified, `--v4` is enabled
 
 ### Example
-`hptp --v4 --host example.com --ports [80,443] --log info --runtime multi-threaded`
+`hptp --host example.com --ports [80,443] --log info --runtime multi-threaded`
 
-this would route all ipv4 traffic on 0.0.0.0 on ports 80 and 443 to example.com:\<port>
+this would route all IPv4 traffic on 0.0.0.0 on ports 80 and 443 to example.com:\<port>
 ## Configuration
 
 ### Runtime Types

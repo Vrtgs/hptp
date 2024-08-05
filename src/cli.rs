@@ -25,7 +25,7 @@ pub struct CliArgs {
     ports: PortsArray,
     #[clap(long)]
     log: Option<LevelFilter>,
-    #[clap(long, default_value = "single-threaded")]
+    #[clap(long, alias = "rt", default_value = "single-threaded")]
     runtime: RuntimeType,
 }
 

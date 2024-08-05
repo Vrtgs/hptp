@@ -4,7 +4,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
-## [0.0.8] - 2024-07-18
+## [0.0.9] - 2024-08-5
+- update cli arguments
+
+## [0.0.8] - 2024-08-5
 - crates.io release
 
 ## [0.0.7] - 2024-07-18
