@@ -2,6 +2,11 @@
 name = "hptp"
 version = "0.0.8"
 edition = "2021"
+authors = ["Vrtgs"]
+license = "MIT or Apache-2.0"
+description = "the high performance TCP proxy written in rust"
+repository = "https://github.com/Vrtgs/hptp/tree/master"
+documentation = "https://github.com/Vrtgs/hptp/blob/master/README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
