@@ -41,7 +41,7 @@ clap = { version = "4.5.13", features = ["derive"], optional = true }
 strum = { version = "0.26.3", features = ["derive"] }
 smallvec = { version = "2.0.0-alpha.6", features = ["write"] }
 itertools = "0.13.0"
-hickory-resolver = "0.25.0-alpha.1"
+hickory-resolver = "0.25.0-alpha.2"
 thiserror = "1.0.63"
 cfg-if = "1.0.0"
 url = "2.5.2"
