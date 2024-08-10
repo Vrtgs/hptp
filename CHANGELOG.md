@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.0.10] - 2024-08-5
+- update README.md
+- update dependencies
+
 ## [0.0.9] - 2024-08-5
 - update cli arguments
 
