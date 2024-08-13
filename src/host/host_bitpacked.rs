@@ -46,7 +46,7 @@ unsafe impl Sync for Host {}
 impl Host {
     #[inline(always)]
     unsafe fn as_ip_ref(&self) -> &'static IpAddr {
-        const { assert!(IP_TAG <= std::mem::size_of::<AlignedIp>()) }
+        const { assert!(IP_TAG <= size_of::<AlignedIp>()) }
 
         // Note: We know `IP_TAG <= size_of::<AlignedIp>()`,
         // and this function will only be called on instances of self where IP_TAG is set
@@ -82,7 +82,7 @@ impl Host {
 
 impl From<&'static AlignedIp> for Host {
     fn from(value: &'static AlignedIp) -> Self {
-        const { assert!(IP_TAG <= std::mem::size_of::<AlignedIp>()) }
+        const { assert!(IP_TAG <= size_of::<AlignedIp>()) }
 
         // Note: We know `IP_TAG <= size_of::<AlignedIp>()`,
         // and this function will only be called on instances of self where IP_TAG is set

@@ -66,8 +66,8 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
     let mut listener = {
         let len = ports.len();
         match allow {
-            prot @ (AllowProtocol::Ipv4 | AllowProtocol::Ipv6) => {
-                let addr = match prot {
+            proto @ (AllowProtocol::Ipv4 | AllowProtocol::Ipv6) => {
+                let addr = match proto {
                     AllowProtocol::Ipv4 => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
                     AllowProtocol::Ipv6 => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
                     _ => unreachable!(),

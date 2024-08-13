@@ -1,10 +1,10 @@
-use std::io::IsTerminal;
-use std::iter::FusedIterator;
-use std::str::FromStr;
-use std::{io, ops};
-
 use clap::Parser;
 use itertools::Itertools;
+use std::io::IsTerminal;
+use std::iter::FusedIterator;
+use std::num::NonZero;
+use std::str::FromStr;
+use std::{io, ops};
 use tracing::level_filters::LevelFilter;
 
 use crate::host::Host;
@@ -164,9 +164,16 @@ pub fn main() -> ! {
 
     tracing::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
 
-    let runtime_builder = match args.runtime {
-        RuntimeType::CurrentThread => tokio::runtime::Builder::new_current_thread(),
-        RuntimeType::MultiThreaded => tokio::runtime::Builder::new_multi_thread(),
+    let runtime_builder = match (
+        args.runtime,
+        std::thread::available_parallelism().map(NonZero::get),
+    ) {
+        (RuntimeType::MultiThreaded, Ok(threads @ 2..)) => {
+            let mut builder = tokio::runtime::Builder::new_multi_thread();
+            builder.worker_threads(threads);
+            builder
+        }
+        _ => tokio::runtime::Builder::new_current_thread(),
     };
 
     build_runtime(runtime_builder).block_on(real_main(ProgramArgs { ports, host, allow }))
