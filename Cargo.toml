@@ -1,6 +1,6 @@
 [package]
 name = "hptp"
-version = "0.0.10"
+version = "0.0.11"
 edition = "2021"
 authors = ["Vrtgs"]
 license = "MIT OR Apache-2.0"
@@ -48,6 +48,3 @@ url = "2.5.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 tokio-splice = "0.2.1"
-
-[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
-mimalloc = "0.1.43"

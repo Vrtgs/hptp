@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.0.11] - 2024-08-5
+- only run multi-threaded runtime when there is more than one thread available
+- use splice sys-call on macOS
+- stop using custom allocator
+
 ## [0.0.10] - 2024-08-5
 - update README.md
 - update dependencies
