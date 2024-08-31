@@ -1,5 +1,6 @@
 use std::fmt::Display;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::num::NonZero;
 use std::time::Duration;
 
 use tokio::io;
@@ -58,7 +59,7 @@ async fn copy_to(host: Host, port: u16, mut stream: TcpStream, _peer: SocketAddr
     }
 }
 
-async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result<Never> {
+async fn listen(ports: Vec<NonZero<u16>>, host: Host, allow: AllowProtocol) -> io::Result<Never> {
     let mut listener = {
         let len = ports.len();
         match allow {
@@ -69,14 +70,14 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
                     _ => unreachable!(),
                 };
 
-                ManyTcpListener::bind(ports.into_iter().map(|port| (addr, port)), len).await?
+                ManyTcpListener::bind(ports.into_iter().map(|port| (addr, port.get())), len).await?
             }
             AllowProtocol::Both => {
                 ManyTcpListener::bind(
                     ports.into_iter().flat_map(|port| {
                         [
-                            SocketAddr::from((Ipv4Addr::UNSPECIFIED, port)),
-                            SocketAddr::from((Ipv6Addr::UNSPECIFIED, port)),
+                            SocketAddr::from((Ipv4Addr::UNSPECIFIED, port.get())),
+                            SocketAddr::from((Ipv6Addr::UNSPECIFIED, port.get())),
                         ]
                     }),
                     len * 2,
@@ -101,12 +102,17 @@ async fn listen(ports: Vec<u16>, host: Host, allow: AllowProtocol) -> io::Result
 }
 
 pub struct ProgramArgs {
-    ports: Vec<u16>,
+    ports: Vec<NonZero<u16>>,
     host: Host,
     allow: AllowProtocol,
 }
 
 pub async fn real_main(args: ProgramArgs) -> ! {
+    tokio::spawn(async {
+        let _ = tokio::signal::ctrl_c().await;
+        std::process::exit(0)
+    });
+
     listen(args.ports, args.host, args.allow)
         .await
         .map(Never::never)
@@ -122,7 +128,7 @@ pub fn build_runtime(mut builder: tokio::runtime::Builder) -> tokio::runtime::Ru
         .expect("runtime builder failed")
 }
 
-pub fn set_panic_hook() {
+pub fn set_hooks() {
     std::panic::set_hook(Box::new(|info| {
         let msg = match info.payload().downcast_ref::<&str>() {
             Some(s) => s,
@@ -146,7 +152,7 @@ pub fn set_panic_hook() {
 }
 
 fn main() {
-    set_panic_hook();
+    set_hooks();
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "cli")] {

@@ -8,12 +8,12 @@ use hickory_resolver::Name;
 use smallvec::SmallVec;
 use tokio::io;
 
-pub use host_bitpacked::Host;
-
 use crate::dns_resolver::DnsResolver;
 use crate::host::host_bitpacked::{AlignedIp, DynamicHost, HostRpr};
 
 mod host_bitpacked;
+
+pub type Host = host_bitpacked::Host;
 
 pub fn try_insert_with<T, F: FnOnce() -> T>(once_lock: &OnceLock<T>, f: F) -> Option<&T> {
     let mut run = Some(f);
@@ -53,6 +53,13 @@ impl FromStr for Host {
 }
 
 impl Host {
+    pub fn as_string(self) -> String {
+        match self.as_repr() {
+            HostRpr::Static(ip) => ip.to_string(),
+            HostRpr::Dynamic(host) => host.name.to_string(),
+        }
+    }
+
     pub async fn to_hosts(self, port: u16) -> io::Result<SmallVec<SocketAddr, 1>> {
         Ok(match self.as_repr() {
             HostRpr::Static(&ip) => smallvec::smallvec![SocketAddr::new(ip, port)],

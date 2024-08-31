@@ -15,7 +15,7 @@ hptp is a high-performance TCP proxy designed to forward traffic to a specified 
 - `--v4` (alias: `--ipv4`): Enable IPv4.
 - `--v6` (alias: `--ipv6`): Enable IPv6.
 - `--host <HOST>`: Specify the host to forward traffic to.
-- `--ports <PORTS>`: Specify the ports to forward traffic to.
+- `--ports <PORTS>`: Specify the port\s to forward traffic to.
 - `--runtime <Runtime type>` (alias: `--rt`): Specify runtime (default `single-threaded`).
 
 by default if neither `--v4` or `--v6` are specified, `--v4` is enabled
@@ -45,9 +45,12 @@ The ports array allows you to specify which ports the proxy should forward traff
 
 The ports array is parsed from a string representation, and it supports a mix of individual ports and ranges. Here’s how it works:
 
+- ports should be **non-zero**
 - The string should start with `[` and end with `]`.
 - Inside the brackets, ports and ranges are separated by commas.
 - Each element can be an individual port, an inclusive range, or an exclusive range.
+
+note, passing in one port number also works
 
 #### Examples
 `[80, 443, 20..24, 2040..!=2080]` <br>
