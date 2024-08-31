@@ -29,7 +29,7 @@ pub fn setup_startup(daemon: Daemon, args: RunArgs) -> ! {
         format!(
             include_str!("./macos_launchd.plist"),
             program_path = exe_path(),
-            args = LDArgs(std::iter::once("run").chain(args.args()))
+            args = LDArgs(std::iter::once("run".into()).chain(args.args()))
         ),
     )
     .unwrap();
