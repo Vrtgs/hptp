@@ -177,20 +177,15 @@ pub fn remove_startup(daemon: Daemon) -> ! {
 
     ensure_admin().unwrap();
 
-    let remove_startup = move || -> io::Result<()> {
-        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-        hklm.open_subkey_with_flags(STARTUP_KEY, KEY_SET_VALUE)?
-            .delete_value(APP_NAME)?;
+    // best effort cleanup
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let _ = hklm
+        .open_subkey_with_flags(STARTUP_KEY, KEY_SET_VALUE)
+        .and_then(|key| key.delete_value(APP_NAME));
 
-        // this is an optional key
-        if let Ok(reg) = hklm.open_subkey_with_flags(TASK_MANAGER_OVERRIDE, KEY_SET_VALUE) {
-            reg.delete_value(APP_NAME)?;
-        }
-
-        Ok(())
-    };
-
-    remove_startup().unwrap();
+    if let Ok(reg) = hklm.open_subkey_with_flags(TASK_MANAGER_OVERRIDE, KEY_SET_VALUE) {
+        let _ = reg.delete_value(APP_NAME);
+    }
 
     let sys_info = sysinfo::System::new_with_specifics(
         RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
@@ -200,14 +195,11 @@ pub fn remove_startup(daemon: Daemon) -> ! {
     let path = Path::new(&path);
     sys_info
         .processes()
-        .iter()
-        .filter(|(_, proc)| proc.exe() == Some(path))
-        .try_for_each(|(pid, proc)| {
-            proc.kill().then_some(()).ok_or_else(|| {
-                io::Error::other(format!("Couldn't kill process (pid: {})", pid.as_u32()))
-            })
-        })
-        .unwrap();
+        .values()
+        .filter(|proc| proc.exe() == Some(path))
+        .for_each(|proc| {
+            let _ = proc.kill();
+        });
 
     std::process::exit(0)
 }

@@ -21,10 +21,26 @@ hptp is a high-performance TCP proxy designed to forward traffic to a specified 
 by default if neither `--v4` or `--v6` are specified, `--v4` is enabled
 
 ### Example
-`hptp --host example.com --ports [80,443] --log info --runtime multi-threaded`
+`hptp run --host example.com --ports [80,443] --log info --runtime multi-threaded`
 
 this would route all IPv4 traffic on 0.0.0.0 on ports 80 and 443 to example.com:\<port>
+
+`hptp set-up-daemon --host example.com --ports [80,443] --log info --runtime multi-threaded`
+
+this would do the same as above except it would run it as a daemon
+
+
 ## Configuration
+
+## Subcommands
+
+`hptp run <run arguments>` runs the hptp proxy <br>
+`hptp set-up-daemon <daemon> <run arguments>`<br>
+`hptp remove-daemon <daemon>` removes <br>
+
+on windows and mac daemon is implicit, but on linux must be specified, currently hptp supports either systemd or open-rc
+
+## Run Arguments
 
 ### Runtime Types
 - `single-threaded`: Runs the proxy on a single thread.

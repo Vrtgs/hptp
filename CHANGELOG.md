@@ -4,24 +4,25 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
-## [0.0.12] - 2024-08-31
+## [0.0.12] - 2024-09-03
 - only run multi-threaded runtime when there is more than one thread available
 - stop using custom allocator
 - ability to add to startup and run as a daemon
+- new subcommands (run, set-up-daemon, remove-daemon)
 
 
-## [0.0.11] - 2024-08-5
+## [0.0.11] - 2024-08-05
 - only run multi-threaded runtime when there is more than one thread available
 - stop using custom allocator
 
-## [0.0.10] - 2024-08-5
+## [0.0.10] - 2024-08-05
 - update README.md
 - update dependencies
 
-## [0.0.9] - 2024-08-5
+## [0.0.9] - 2024-08-05
 - update cli arguments
 
-## [0.0.8] - 2024-08-5
+## [0.0.8] - 2024-08-05
 - crates.io release
 
 ## [0.0.7] - 2024-07-18
