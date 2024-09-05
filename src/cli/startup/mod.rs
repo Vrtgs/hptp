@@ -3,7 +3,8 @@ use std::io;
 use std::io::ErrorKind;
 use std::path::Path;
 
-#[cfg_attr(windows, expect(unused_macros))]
+// #[cfg_attr(windows, expect(unused_macros))]
+#[cfg_attr(windows, allow(unused_macros))]
 macro_rules! cmd {
     ($exe: literal $($arg: expr)*; option: propagate) => {
         (|| {
@@ -36,7 +37,8 @@ fn exe_path() -> String {
         .expect("the current exes path contains invalid utf-8")
 }
 
-#[cfg_attr(windows, expect(dead_code))]
+// #[cfg_attr(windows, expect(dead_code))]
+#[cfg_attr(windows, allow(dead_code))]
 fn rm_file<P: AsRef<Path>>(path: P) -> io::Result<()> {
     std::fs::remove_file(path).or_else(|e| match e.kind() {
         ErrorKind::NotFound => Ok(()),

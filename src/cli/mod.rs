@@ -72,7 +72,8 @@ impl RunArgs {
 }
 
 impl RunArgs {
-    #[cfg_attr(target_os = "linux", expect(dead_code))]
+    // #[cfg_attr(target_os = "linux", expect(dead_code))]
+    #[cfg_attr(target_os = "linux", allow(dead_code))]
     pub fn args(&self) -> impl Iterator<Item = Cow<'static, str>> + Clone {
         let mut allow_args = ["--v4", "--v6"].into_iter();
         match self.allow_protocol() {
