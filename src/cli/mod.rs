@@ -72,8 +72,7 @@ impl RunArgs {
 }
 
 impl RunArgs {
-    // TODO: use expect
-    #[cfg_attr(target_os = "linux", allow(dead_code))]
+    #[cfg_attr(target_os = "linux", expect(dead_code))]
     pub fn args(&self) -> impl Iterator<Item = Cow<'static, str>> + Clone {
         let mut allow_args = ["--v4", "--v6"].into_iter();
         match self.allow_protocol() {
@@ -124,7 +123,7 @@ impl Display for RunArgs {
         }
 
         f.write_fmt(format_args!(
-            "{proto} --host {host} --ports {ports} --log {log} --rt {rt}",
+            "{proto} --host {host} --ports \"{ports}\" --log {log} --rt {rt}",
             proto = ArgAllowProtocol(self.allow_protocol()),
             host = self.host.as_string(),
             ports = self.ports,
