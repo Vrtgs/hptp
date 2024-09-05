@@ -3,8 +3,7 @@ use std::io;
 use std::io::ErrorKind;
 use std::path::Path;
 
-// TODO: use expect
-#[cfg_attr(windows, allow(unused_macros))]
+#[cfg_attr(windows, expect(unused_macros))]
 macro_rules! cmd {
     ($exe: literal $($arg: expr)*; option: propagate) => {
         (|| {

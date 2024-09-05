@@ -5,7 +5,6 @@ use std::io;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
-use std::process::Stdio;
 
 pub fn setup_startup(daemon: Daemon, args: RunArgs) -> ! {
     if !nix::unistd::Uid::effective().is_root() {
