@@ -3,7 +3,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::OnceLock;
 
-use hickory_resolver::proto::error::ProtoError as DnsProtoError;
+use hickory_resolver::proto::ProtoError as DnsProtoError;
 use hickory_resolver::Name;
 use smallvec::SmallVec;
 use tokio::io;
@@ -60,7 +60,7 @@ impl Host {
         }
     }
 
-    pub async fn to_hosts(self, port: u16) -> io::Result<SmallVec<SocketAddr, 1>> {
+    pub async fn to_hosts(self, port: u16) -> io::Result<SmallVec<SocketAddr, 4>> {
         Ok(match self.as_repr() {
             HostRpr::Static(&ip) => smallvec::smallvec![SocketAddr::new(ip, port)],
             HostRpr::Dynamic(host) => host.resolver.resolve(host.name.clone(), port).await?,

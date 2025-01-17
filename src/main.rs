@@ -130,20 +130,18 @@ pub fn build_runtime(mut builder: tokio::runtime::Builder) -> tokio::runtime::Ru
 
 pub fn set_hooks() {
     std::panic::set_hook(Box::new(|info| {
-        let msg = match info.payload().downcast_ref::<&str>() {
-            Some(s) => s,
-            None => match info.payload().downcast_ref::<String>() {
-                Some(s) => s,
-                None => "Box<dyn Any>",
-            },
-        };
+        let msg = info
+            .payload()
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| info.payload().downcast_ref::<String>().map(|s| &**s))
+            .unwrap_or("Box<dyn Any>");
 
         match cfg!(debug_assertions) {
             true => {
                 let location = info
                     .location()
-                    .map(|x| x as &dyn Display)
-                    .unwrap_or_else(|| &"<unknown file>");
+                    .map_or(&"<unknown file>" as &dyn Display, |loc| loc);
                 tracing::error!("Fatal: panicked at {location}: [{msg}]")
             }
             false => tracing::error!("Fatal: panicked at [{msg}]"),

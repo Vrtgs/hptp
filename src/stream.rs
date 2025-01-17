@@ -6,10 +6,14 @@ use rand::seq::SliceRandom;
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 
-struct ShuffleLimit(u16);
+struct RateLimiter(u16);
 
-impl ShuffleLimit {
-    fn try_shuffle<F: FnOnce()>(&mut self, f: F) {
+impl RateLimiter {
+    fn new() -> Self {
+        Self(0)
+    }
+
+    fn try_do<F: FnOnce()>(&mut self, f: F) {
         let (cnt, overflow) = self.0.overflowing_add(1);
         if overflow {
             f()
@@ -21,7 +25,7 @@ impl ShuffleLimit {
 
 pub struct ManyTcpListener {
     listeners: Box<[(TcpListener, SocketAddr)]>,
-    shuffle_limit: ShuffleLimit,
+    shuffle_limit: RateLimiter,
 }
 
 impl ManyTcpListener {
@@ -43,11 +47,11 @@ impl ManyTcpListener {
         }?
         .into_boxed_slice();
 
-        listeners.shuffle(&mut rand::thread_rng());
+        listeners.shuffle(&mut rand::rng());
 
         Ok(Self {
             listeners,
-            shuffle_limit: ShuffleLimit(0),
+            shuffle_limit: RateLimiter::new(),
         })
     }
 
@@ -66,7 +70,7 @@ impl ManyTcpListener {
         }
 
         self.shuffle_limit
-            .try_shuffle(|| self.listeners.shuffle(&mut rand::thread_rng()));
+            .try_do(|| self.listeners.shuffle(&mut rand::rng()));
 
         select(&mut self.listeners, |(listener, local)| {
             listener.poll_accept(cx).map_ok(|(s, p)| (s, *local, p))

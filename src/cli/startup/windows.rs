@@ -11,7 +11,7 @@ use std::process::Command;
 use sysinfo::{ProcessRefreshKind, RefreshKind};
 use windows::core::Owned;
 use windows::core::{w, PCWSTR};
-use windows::Win32::Foundation::{HANDLE, HWND};
+use windows::Win32::Foundation::HANDLE;
 use windows::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
 use windows::Win32::System::Com::{
     CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
@@ -98,7 +98,7 @@ fn ensure_admin() -> io::Result<()> {
                 .expect("Failed ot initialize COM");
 
             let ret = ShellExecuteW(
-                HWND::default(),
+                None,
                 w!("runas"),
                 PCWSTR::from_raw(cmd_wide.as_ptr()),
                 PCWSTR::from_raw(args_wide.as_ptr()),
@@ -188,7 +188,7 @@ pub fn remove_startup(daemon: Daemon) -> ! {
     }
 
     let sys_info = sysinfo::System::new_with_specifics(
-        RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
+        RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
     );
 
     let path = exe_path();

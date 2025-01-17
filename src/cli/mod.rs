@@ -49,7 +49,7 @@ const fn default_log_level() -> LevelFilter {
 struct RunArgs {
     #[clap(long, value_name = "the host this proxy shall forward to")]
     host: Host,
-    #[clap(long, short, value_name = r"the port\s this proxy shall forward")]
+    #[clap(long, value_name = r"the port\s this proxy shall forward")]
     ports: PortsArray,
     #[clap(long, alias = "v4")]
     ipv4: bool,

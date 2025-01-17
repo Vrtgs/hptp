@@ -3,19 +3,19 @@ use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 use std::thread::available_parallelism;
 
-use hickory_resolver::config::{LookupIpStrategy, ResolverConfig, ResolverOpts};
-use hickory_resolver::error::ResolveError;
-use hickory_resolver::{Name, TokioAsyncResolver};
+use hickory_resolver::config::{LookupIpStrategy, ResolveHosts, ResolverConfig, ResolverOpts};
+use hickory_resolver::ResolveError;
+use hickory_resolver::{Name, TokioResolver};
 use smallvec::SmallVec;
 
-pub struct DnsResolver(TokioAsyncResolver);
+pub struct DnsResolver(TokioResolver);
 
 impl DnsResolver {
     pub async fn resolve(
         &self,
         host: Name,
         port: u16,
-    ) -> Result<SmallVec<SocketAddr, 1>, ResolveError> {
+    ) -> Result<SmallVec<SocketAddr, 4>, ResolveError> {
         Ok(self
             .0
             .lookup_ip(host)
@@ -28,15 +28,15 @@ impl DnsResolver {
 
 impl Default for DnsResolver {
     fn default() -> Self {
-        let resolver = TokioAsyncResolver::tokio(ResolverConfig::cloudflare(), {
+        let resolver = TokioResolver::tokio(ResolverConfig::cloudflare(), {
             let mut opts = ResolverOpts::default();
             opts.cache_size = 128;
             opts.attempts = 8;
             opts.num_concurrent_reqs = available_parallelism()
                 .map_or(1, NonZeroUsize::get)
-                .saturating_mul(8);
+                .saturating_mul(32);
 
-            opts.use_hosts_file = true;
+            opts.use_hosts_file = ResolveHosts::Always;
             opts.try_tcp_on_error = true;
             opts.ip_strategy = LookupIpStrategy::Ipv4thenIpv6;
             opts

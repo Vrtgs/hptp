@@ -4,10 +4,14 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.0.13] - 2024-09-03
+- update dependencies
+- remove `-p` short form
+
 ## [0.0.12] - 2024-09-03
 - only run multi-threaded runtime when there is more than one thread available
 - stop using custom allocator
-- ability to add to startup and run as a daemon
+- ability to add to start up and run as a daemon
 - new subcommands (run, set-up-daemon, remove-daemon)
 
 
