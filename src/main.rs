@@ -5,7 +5,6 @@ use std::time::Duration;
 
 use tokio::io;
 use tokio::net::TcpStream;
-use tokio::runtime::{Handle, RuntimeFlavor};
 use tokio::time::timeout;
 use tracing::instrument;
 
