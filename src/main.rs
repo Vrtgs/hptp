@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use tokio::io;
 use tokio::net::TcpStream;
+use tokio::runtime::{Handle, RuntimeFlavor};
 use tokio::time::timeout;
 use tracing::instrument;
 
@@ -110,13 +111,21 @@ pub struct ProgramArgs {
 pub async fn real_main(args: ProgramArgs) -> ! {
     tokio::spawn(async {
         let _ = tokio::signal::ctrl_c().await;
+        tracing::info!("Exiting...");
         std::process::exit(0)
     });
 
-    listen(args.ports, args.host, args.allow)
-        .await
-        .map(Never::never)
-        .unwrap_or_else(|err| panic!("{err}"))
+    let run = async move {
+        listen(args.ports, args.host, args.allow)
+            .await
+            .map(Never::never)
+            .unwrap_or_else(|err| panic!("{err}"))
+    };
+
+    // allow `run` to be part of the work stealing pool
+    let jh = tokio::spawn(run);
+    jh.await
+        .unwrap_or_else(|panic| std::panic::resume_unwind(panic.into_panic()))
 }
 
 pub fn build_runtime(mut builder: tokio::runtime::Builder) -> tokio::runtime::Runtime {
