@@ -10,7 +10,8 @@ case "$os" in
         if ldd --version 2>&1 | grep -q 'GNU libc'; then
             target_triplet="${arch}-unknown-${os}-gnu"
         else
-            target_triplet="${arch}-unknown-${os}-musl"
+            echo "only gnu abi supported"
+            exit 1
         fi
         ;;
     darwin)

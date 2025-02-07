@@ -237,6 +237,7 @@ pub fn main() -> ! {
     tracing::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
 
     monoio::RuntimeBuilder::<monoio::FusionDriver>::new()
+        .enable_timer()
         .build()
         .unwrap()
         .block_on(real_main(ProgramArgs { ports, host, allow }))
