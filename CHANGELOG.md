@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
-## [0.1.0] - 2025-02-25
+## [0.1.1] - 2025-02-25
+- Hotfix dynamic host broken issue
+
+
+## [0.1.0] - 2025-02-24
 - switch to `monoio` runtime and use io-uring when possible!
 
 ## [0.0.13] - 2025-01-17
