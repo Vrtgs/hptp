@@ -1,11 +1,10 @@
 # [HPTP] (High performance TCP proxy)
 
-hptp is a high-performance TCP proxy designed to forward traffic to a specified host and ports with configurable runtime options.
+hptp is a high-performance TCP proxy designed to forward traffic to a specified host and ports.
 
 ## Features
 - Supports both IPv4 and IPv6.
 - Configurable logging levels.
-- Choice between single-threaded and multi-threaded runtime.
 - Fast and efficient, using splice sys calls on linux.
 
 ## Usage
@@ -16,16 +15,15 @@ hptp is a high-performance TCP proxy designed to forward traffic to a specified 
 - `--v6` (alias: `--ipv6`): Enable IPv6.
 - `--host <HOST>`: Specify the host to forward traffic to.
 - `--ports <PORTS>`: Specify the port\s to forward traffic to.
-- `--runtime <Runtime type>` (alias: `--rt`): Specify runtime (default `single-threaded`).
 
 by default if neither `--v4` or `--v6` are specified, `--v4` is enabled
 
 ### Example
-`hptp run --host example.com --ports [80,443] --log info --runtime multi-threaded`
+`hptp run --host example.com --ports [80,443] --log info`
 
 this would route all IPv4 traffic on 0.0.0.0 on ports 80 and 443 to example.com:\<port>
 
-`hptp set-up-daemon --host example.com --ports [80,443] --log info --runtime multi-threaded`
+`hptp set-up-daemon --host example.com --ports [80,443] --log info`
 
 this would do the same as above except it would run it as a daemon
 
@@ -41,10 +39,6 @@ this would do the same as above except it would run it as a daemon
 on windows and mac daemon is implicit, but on linux must be specified, currently hptp supports either systemd or open-rc
 
 ## Run Arguments
-
-### Runtime Types
-- `single-threaded`: Runs the proxy on a single thread.
-- `multi-threaded`: Runs the proxy on multiple threads.
 
 ### Ports Array
 

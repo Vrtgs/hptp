@@ -3,13 +3,12 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::io::IsTerminal;
-use std::num::NonZero;
 use std::str::FromStr;
 use tracing::level_filters::LevelFilter;
 
 use crate::cli::ports_array::PortsArray;
 use crate::host::Host;
-use crate::{build_runtime, real_main, AllowProtocol, ProgramArgs};
+use crate::{real_main, AllowProtocol, ProgramArgs};
 
 mod ports_array;
 mod startup;
@@ -57,8 +56,6 @@ struct RunArgs {
     ipv6: bool,
     #[clap(long, default_value_t = default_log_level())]
     log: LevelFilter,
-    #[clap(long, alias = "rt", default_value_t = RuntimeType::SingleThread)]
-    runtime: RuntimeType,
 }
 
 impl RunArgs {
@@ -103,7 +100,6 @@ impl RunArgs {
             "--host", (self.host) {as_string},
             "--ports", (self.ports),
             "--log", (self.log),
-            "--rt", (self.runtime)
         ))
     }
 }
@@ -123,12 +119,11 @@ impl Display for RunArgs {
         }
 
         f.write_fmt(format_args!(
-            "{proto} --host {host} --ports \"{ports}\" --log {log} --rt {rt}",
+            "{proto} --host {host} --ports \"{ports}\" --log {log}",
             proto = ArgAllowProtocol(self.allow_protocol()),
             host = self.host.as_string(),
             ports = self.ports,
             log = self.log,
-            rt = self.runtime
         ))
     }
 }
@@ -241,17 +236,8 @@ pub fn main() -> ! {
 
     tracing::info!("Listening on ip {allow} on ports {ports:?} and forwarding to {host}");
 
-    let runtime_builder = match (
-        args.runtime,
-        std::thread::available_parallelism().map(NonZero::get),
-    ) {
-        (RuntimeType::MultiThreaded, Ok(threads @ 2..)) => {
-            let mut builder = tokio::runtime::Builder::new_multi_thread();
-            builder.worker_threads(threads);
-            builder
-        }
-        _ => tokio::runtime::Builder::new_current_thread(),
-    };
-
-    build_runtime(runtime_builder).block_on(real_main(ProgramArgs { ports, host, allow }))
+    monoio::RuntimeBuilder::<monoio::FusionDriver>::new()
+        .build()
+        .unwrap()
+        .block_on(real_main(ProgramArgs { ports, host, allow }))
 }

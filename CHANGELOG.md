@@ -4,7 +4,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
-## [0.0.13] - 2024-09-03
+## [0.1.0] - 2025-02-25
+- switch to `monoio` runtime and use io-uring when possible!
+
+## [0.0.13] - 2025-01-17
 - update dependencies
 - remove `-p` short form
 

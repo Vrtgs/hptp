@@ -1,15 +1,14 @@
+use monoio::net::TcpStream;
+use monoio::time::timeout;
 use std::fmt::Display;
+use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::num::NonZero;
 use std::time::Duration;
-
-use tokio::io;
-use tokio::net::TcpStream;
-use tokio::time::timeout;
 use tracing::instrument;
 
 use crate::host::Host;
-use crate::stream::ManyTcpListener;
+use crate::stream::{ManyRecvResult, ManyTcpListener};
 
 mod dns_resolver;
 mod host;
@@ -38,16 +37,16 @@ impl Never {
 }
 
 #[instrument(level = "error", skip_all, fields(peer = display(_peer), port = display(port)))]
-async fn copy_to(host: Host, port: u16, mut stream: TcpStream, _peer: SocketAddr) {
+async fn copy_to(host: Host, port: u16, downstream: TcpStream, _peer: SocketAddr) {
     let res = async move {
-        let mut forward_stream = timeout(Duration::from_secs(15), async {
+        let upstream = timeout(Duration::from_secs(15), async {
             TcpStream::connect(&*host.to_hosts(port).await?).await
         })
         .await
         .inspect(|_| tracing::trace!("Successfully connected to {host}"))
         .inspect_err(|_| tracing::debug!("Connecting to {host} timed out"))??;
 
-        sock_io::copy_socks(&mut stream, &mut forward_stream).await
+        sock_io::copy_socks(downstream, upstream).await
     }
     .await;
 
@@ -88,16 +87,24 @@ async fn listen(ports: Vec<NonZero<u16>>, host: Host, allow: AllowProtocol) -> i
     };
 
     loop {
-        let res = listener.accept().await.inspect(|(_, local, peer)| {
-            tracing::info!("New connection from `{peer}` to `{local}`")
-        });
+        let res = listener
+            .accept()
+            .await
+            .inspect(|ManyRecvResult { local, peer, .. }| {
+                tracing::info!("New connection from `{peer}` to `{local}`")
+            });
 
-        let Ok((stream, local, peer)) = res else {
+        let Ok(ManyRecvResult {
+            stream,
+            local,
+            peer,
+        }) = res
+        else {
             tracing::warn!("Connection failed {res:?}");
             continue;
         };
 
-        tokio::spawn(copy_to(host, local.port(), stream, peer));
+        monoio::spawn(copy_to(host, local.port(), stream, peer));
     }
 }
 
@@ -108,32 +115,10 @@ pub struct ProgramArgs {
 }
 
 pub async fn real_main(args: ProgramArgs) -> ! {
-    tokio::spawn(async {
-        let _ = tokio::signal::ctrl_c().await;
-        tracing::info!("Exiting...");
-        std::process::exit(0)
-    });
-
-    let run = async move {
-        listen(args.ports, args.host, args.allow)
-            .await
-            .map(Never::never)
-            .unwrap_or_else(|err| panic!("{err}"))
-    };
-
-    // allow `run` to be part of the work stealing pool
-    let jh = tokio::spawn(run);
-    jh.await
-        .unwrap_or_else(|panic| std::panic::resume_unwind(panic.into_panic()))
-}
-
-pub fn build_runtime(mut builder: tokio::runtime::Builder) -> tokio::runtime::Runtime {
-    builder
-        .enable_all()
-        .on_thread_start(|| tracing::trace!("runtime thread starting..."))
-        .on_thread_stop(|| tracing::trace!("runtime thread stopping..."))
-        .build()
-        .expect("runtime builder failed")
+    listen(args.ports, args.host, args.allow)
+        .await
+        .map(Never::never)
+        .unwrap_or_else(|err| panic!("{err}"))
 }
 
 pub fn set_hooks() {

@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Display, Formatter, Write};
+use std::io;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::OnceLock;
@@ -6,7 +7,6 @@ use std::sync::OnceLock;
 use hickory_resolver::proto::ProtoError as DnsProtoError;
 use hickory_resolver::Name;
 use smallvec::SmallVec;
-use tokio::io;
 
 use crate::dns_resolver::DnsResolver;
 use crate::host::host_bitpacked::{AlignedIp, DynamicHost, HostRpr};
