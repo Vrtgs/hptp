@@ -31,7 +31,7 @@ cli = ["dep:clap", "dep:nix", "dep:paste"]
 
 
 [dependencies]
-monoio = { version = "0.2.4", features = ["splice", "zero-copy"] }
+monoio = { version = "0.2.4", features = ["splice", "zero-copy", "sync"] }
 tokio = { version = "1.43.0", features = ["net", "time", "rt"] }
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
