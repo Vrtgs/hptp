@@ -6,13 +6,7 @@ os=$(uname -s | tr '[:upper:]' '[:lower:]')
 
 case "$os" in
     linux)
-        # Check if GNU libc is installed
-        if ldd --version 2>&1 | grep -q 'GNU libc'; then
-            target_triplet="${arch}-unknown-${os}-gnu"
-        else
-            echo "only gnu abi supported"
-            exit 1
-        fi
+        target_triplet="${arch}-unknown-${os}-gnu"
         ;;
     darwin)
         target_triplet="${arch}-apple-darwin"
