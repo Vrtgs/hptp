@@ -1,25 +1,52 @@
+use futures::channel::oneshot;
 use hickory_resolver::config::{LookupIpStrategy, ResolveHosts, ResolverConfig, ResolverOpts};
+use hickory_resolver::dns_lru::{DnsLru, TtlConfig};
+use hickory_resolver::lookup_ip::LookupIp;
+use hickory_resolver::proto::op::Query;
+use hickory_resolver::proto::rr::RecordType;
 use hickory_resolver::ResolveError;
 use hickory_resolver::{Name, TokioResolver};
 use smallvec::SmallVec;
-use std::convert::Infallible;
 use std::fmt::{Debug, Formatter};
 use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 use std::sync::LazyLock;
 use std::thread::available_parallelism;
+use std::time::Instant;
 
-pub struct DnsResolver(TokioResolver);
+pub struct DnsResolver(DnsLru);
 
-static GLOBAL_RT: LazyLock<tokio::runtime::Handle> = LazyLock::new(|| {
+type DomainRequest = (Name, oneshot::Sender<Result<LookupIp, ResolveError>>);
+
+static DNS_RESOLVER: LazyLock<flume::Sender<DomainRequest>> = LazyLock::new(|| {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    let handle = rt.handle().clone();
-    std::thread::spawn(move || rt.block_on(std::future::pending::<Infallible>()));
-    handle
+    let (tx, rx) = flume::unbounded::<DomainRequest>();
+    let fut = async move {
+        let resolver = TokioResolver::tokio(ResolverConfig::cloudflare(), {
+            let mut opts = ResolverOpts::default();
+            opts.cache_size = 0;
+            opts.attempts = 8;
+            opts.num_concurrent_reqs = available_parallelism()
+                .map_or(1, NonZeroUsize::get)
+                .saturating_mul(32);
+
+            opts.use_hosts_file = ResolveHosts::Always;
+            opts.try_tcp_on_error = true;
+            opts.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
+            opts
+        });
+
+        while let Ok((name, tx)) = rx.recv_async().await {
+            let _ = tx.send(resolver.lookup_ip(name).await);
+        }
+    };
+    std::thread::spawn(move || rt.block_on(fut));
+
+    tx
 });
 
 impl DnsResolver {
@@ -28,38 +55,40 @@ impl DnsResolver {
         host: Name,
         port: u16,
     ) -> Result<SmallVec<SocketAddr, 4>, ResolveError> {
-        GLOBAL_RT
-            .spawn(async move {
-                Ok(self
-                    .0
-                    .lookup_ip(host)
-                    .await?
-                    .iter()
-                    .map(|ip| (ip, port).into())
-                    .collect())
-            })
-            .await
-            .unwrap()
+        let mut query = Query::query(host, RecordType::A);
+        let now = Instant::now();
+
+        let res = self.0.get(&query, now).or_else(|| {
+            query.set_query_type(RecordType::AAAA);
+            self.0.get(&query, now)
+        });
+
+        let iter = match res {
+            Some(res) => res?.into(),
+            None => {
+                let (tx, rx) = oneshot::channel();
+                DNS_RESOLVER
+                    .send((query.into_parts().name, tx))
+                    .map_err(|_| "dns resolver disconnected")?;
+                let ret = rx.await.map_err(|_| "dns resolver didn't reply")??;
+
+                self.0.insert_records(
+                    ret.query().clone(),
+                    ret.as_lookup().records().iter().cloned(),
+                    Instant::now(),
+                );
+
+                ret
+            }
+        };
+
+        Ok(iter.iter().map(|ip| (ip, port).into()).collect())
     }
 }
 
 impl Default for DnsResolver {
     fn default() -> Self {
-        let resolver = TokioResolver::tokio(ResolverConfig::cloudflare(), {
-            let mut opts = ResolverOpts::default();
-            opts.cache_size = 128;
-            opts.attempts = 8;
-            opts.num_concurrent_reqs = available_parallelism()
-                .map_or(1, NonZeroUsize::get)
-                .saturating_mul(32);
-
-            opts.use_hosts_file = ResolveHosts::Always;
-            opts.try_tcp_on_error = true;
-            opts.ip_strategy = LookupIpStrategy::Ipv4thenIpv6;
-            opts
-        });
-
-        DnsResolver(resolver)
+        DnsResolver(DnsLru::new(128, TtlConfig::default()))
     }
 }
 
